@@ -524,6 +524,11 @@ function num(v,def=0){const n=parseFloat(v);return isNaN(n)?def:n;}
 // UTILS
 // ============================================================
 function yen(v){return v?'¥'+Math.round(v).toLocaleString():'—';}
+// 最小単位単価（kg→g・L→ml換算後の細かい単価）は小数点以下も表示する
+function yenU(v){
+  if(!v && v!==0) return '—';
+  return '¥'+v.toLocaleString('ja-JP',{minimumFractionDigits:2,maximumFractionDigits:4});
+}
 function pct(v){return(v||v===0)?((v*100).toFixed(1)+'%'):'—';}
 function rcls(r){if(!r&&r!==0)return'rb-none';return r<=0.30?'rb-safe':r<=0.38?'rb-warn':'rb-danger';}
 function showLoad(v){document.getElementById('loading').className='loading'+(v?'':' hide');}
@@ -618,7 +623,7 @@ function renderIngSec(dept,listId,cntId,fn){
         <div class="li-name">${dot}${i.name}</div>
         <div class="li-sub"><span class="ct">${catLabel(i.cat)}</span>${i.supplier?`<span class="sup-badge">${i.supplier}</span>`:''} ${diff}</div>
       </div>
-      <div class="li-right"><div class="li-val">${i.unitPrice?yen(i.unitPrice):'—'}</div><div class="li-lbl">/ ${i.unit}</div></div>
+      <div class="li-right"><div class="li-val">${i.unitPrice?yenU(i.unitPrice):'—'}</div><div class="li-lbl">/ ${i.unit}</div></div>
     </div>`;
   }).join('');
 }
@@ -662,7 +667,7 @@ function editMenu(id){openMenuModal(id);}
 
 function addIngRow(data){
   rowC++; const rid='r'+rowC;
-  const opts=S.ings.map(i=>`<option value="${i.id}" data-up="${i.unitPrice}" data-unit="${i.unit}" data-yield="${i.stdYield||''}" ${data&&data.ingId===i.id?'selected':''}>${i.name}（${yen(i.unitPrice)}/${i.unit}）</option>`).join('');
+  const opts=S.ings.map(i=>`<option value="${i.id}" data-up="${i.unitPrice}" data-unit="${i.unit}" data-yield="${i.stdYield||''}" ${data&&data.ingId===i.id?'selected':''}>${i.name}（${yenU(i.unitPrice)}/${i.unit}）</option>`).join('');
   const div=document.createElement('div');
   div.id=rid; div.className='ing-card';
   div.innerHTML=`
