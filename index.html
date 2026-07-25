@@ -184,7 +184,7 @@ body{font-family:var(--font);background:var(--paper);color:var(--ink);min-height
 <header class="app-header">
   <div class="logo">
     <div class="logo-badge">権兵衛</div>
-    <div><div class="logo-name" id="store-name">原価管理</div><div class="logo-sub">炭火焼き居酒屋</div></div>
+    <div><div class="logo-name" id="store-name">原価管理</div><div class="logo-sub">梅北セントラルキッチン</div></div>
   </div>
   <div class="sync-wrap"><div class="sync-dot" id="sync-dot"></div><span id="sync-lbl">同期済み</span></div>
 </header>
@@ -667,7 +667,17 @@ function editMenu(id){openMenuModal(id);}
 
 function addIngRow(data){
   rowC++; const rid='r'+rowC;
-  const opts=S.ings.map(i=>`<option value="${i.id}" data-up="${i.unitPrice}" data-unit="${i.unit}" data-yield="${i.stdYield||''}" ${data&&data.ingId===i.id?'selected':''}>${i.name}（${yenU(i.unitPrice)}/${i.unit}）</option>`).join('');
+
+  // 既存データがあれば、選択されている食材から部門・カテゴリを逆引きして絞込みの初期値にする
+  let initDept = 'food', initCat = 'all';
+  if (data && data.ingId){
+    const hitIng = S.ings.find(x=>x.id===data.ingId);
+    if (hitIng){
+      initDept = hitIng.dept==='飲料' ? 'drink' : hitIng.dept==='消耗品・その他' ? 'misc' : 'food';
+      initCat = hitIng.cat || 'all';
+    }
+  }
+
   const div=document.createElement('div');
   div.id=rid; div.className='ing-card';
   div.innerHTML=`
@@ -675,9 +685,23 @@ function addIngRow(data){
       <span style="font-size:12px;color:var(--muted);font-weight:600">食材 ${rowC}</span>
       <button class="btn btn-g btn-sm" style="color:var(--danger);padding:4px 8px;min-height:28px" onclick="rmRow('${rid}')">✕</button>
     </div>
+    <div class="row2" style="margin-bottom:8px">
+      <div class="field" style="margin-bottom:0">
+        <label class="f-label" style="font-size:11px">部門で絞込み</label>
+        <select class="select" id="${rid}-fdept" onchange="onFilterDeptChange('${rid}')">
+          <option value="food" ${initDept==='food'?'selected':''}>食材</option>
+          <option value="drink" ${initDept==='drink'?'selected':''}>飲料</option>
+          <option value="misc" ${initDept==='misc'?'selected':''}>消耗品・その他</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label class="f-label" style="font-size:11px">カテゴリで絞込み</label>
+        <select class="select" id="${rid}-fcat" onchange="onFilterCatChange('${rid}')"></select>
+      </div>
+    </div>
     <div class="field" style="margin-bottom:8px">
       <select class="select" id="${rid}-ing" onchange="onIngSel('${rid}')">
-        <option value="">— 食材を選択 —</option>${opts}
+        <option value="">— 食材を選択 —</option>
       </select>
     </div>
     <div class="row2">
@@ -696,7 +720,51 @@ function addIngRow(data){
     </div>
     <input type="hidden" id="${rid}-up" value="${data?data.unitPrice:0}">`;
   document.getElementById('ing-rows').appendChild(div);
+
+  populateFilterCatOptions(rid, initDept, initCat);
+  populateIngOptions(rid, initDept, initCat, data ? data.ingId : null);
   if(data&&data.ingId) setTimeout(()=>onIngSel(rid,true),0);
+}
+
+// 部門で絞込み → カテゴリ選択肢を構築
+function populateFilterCatOptions(rid, dept, selectedCat){
+  const catSel = document.getElementById(rid+'-fcat');
+  const cats = S.cats[dept] || [];
+  catSel.innerHTML = '<option value="all">すべて</option>'
+    + cats.map(c=>`<option value="${c.v}" ${selectedCat===c.v?'selected':''}>${c.l}</option>`).join('');
+}
+
+// 部門・カテゴリの絞込み条件に合う食材だけを選択肢に出す
+function populateIngOptions(rid, dept, cat, selectedIngId){
+  const deptLabel = {food:'食材',drink:'飲料',misc:'消耗品・その他'}[dept] || '食材';
+  const filtered = S.ings.filter(i => i.dept===deptLabel && (cat==='all' || i.cat===cat));
+  const ingSel = document.getElementById(rid+'-ing');
+  ingSel.innerHTML = `<option value="">— 食材を選択（${filtered.length}件）—</option>`
+    + filtered.map(i=>`<option value="${i.id}" data-up="${i.unitPrice}" data-unit="${i.unit}" data-yield="${i.stdYield||''}" ${selectedIngId===i.id?'selected':''}>${i.name}（${yenU(i.unitPrice)}/${i.unit}）</option>`).join('');
+
+  // 該当する食材がまだ選ばれていない場合は単位・単価の値をクリア
+  if (!selectedIngId){
+    const unitEl = document.getElementById(rid+'-unit');
+    const upEl = document.getElementById(rid+'-up');
+    if (unitEl) unitEl.value='';
+    if (upEl) upEl.value=0;
+  }
+}
+
+// 部門の絞込みを変更 → カテゴリを「すべて」に戻し、食材選択肢を再構築
+function onFilterDeptChange(rid){
+  const dept = document.getElementById(rid+'-fdept').value;
+  populateFilterCatOptions(rid, dept, 'all');
+  populateIngOptions(rid, dept, 'all', null);
+  recalcPrev();
+}
+
+// カテゴリの絞込みを変更 → 食材選択肢を再構築
+function onFilterCatChange(rid){
+  const dept = document.getElementById(rid+'-fdept').value;
+  const cat = document.getElementById(rid+'-fcat').value;
+  populateIngOptions(rid, dept, cat, null);
+  recalcPrev();
 }
 
 function onIngSel(rid,skip){
